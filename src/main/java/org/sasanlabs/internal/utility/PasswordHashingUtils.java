@@ -22,6 +22,9 @@ public final class PasswordHashingUtils {
      * that is not either SHA-256 with a salt or bcrypt, so they are gone rather than merely unused.
      */
     public enum HashAlgorithm {
+        MD4("MD4"),
+        MD5("MD5"),
+        SHA1("SHA-1"),
         SHA256("SHA-256");
 
         private final String algorithmName;
@@ -40,6 +43,59 @@ public final class PasswordHashingUtils {
         if (Security.getProvider("BC") == null) {
             Security.addProvider(new BouncyCastleProvider());
         }
+    }
+
+    public static String md4Hex(String rawPassword) {
+        return getHashAsHex(rawPassword, HashAlgorithm.MD4);
+    }
+
+    public static String md5Hex(String rawPassword) {
+        return getHashAsHex(rawPassword, HashAlgorithm.MD5);
+    }
+
+    public static String sha1Hex(String rawPassword) {
+        return getHashAsHex(rawPassword, HashAlgorithm.SHA1);
+    }
+
+    public static String unsaltedSha256Hex(String rawPassword) {
+        return getHashAsHex(rawPassword, HashAlgorithm.SHA256);
+    }
+
+    public static String lmHash(String rawPassword) {
+        try {
+            String pwd = rawPassword.toUpperCase();
+            byte[] keyBytes = new byte[14];
+            byte[] passwordBytes = pwd.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+            System.arraycopy(passwordBytes, 0, keyBytes, 0, Math.min(passwordBytes.length, 14));
+            byte[] tmpKey1 = new byte[7];
+            byte[] tmpKey2 = new byte[7];
+            System.arraycopy(keyBytes, 0, tmpKey1, 0, 7);
+            System.arraycopy(keyBytes, 7, tmpKey2, 0, 7);
+            return EncodingUtils.bytesToHex(lmDesEncrypt(tmpKey1))
+                    + EncodingUtils.bytesToHex(lmDesEncrypt(tmpKey2));
+        } catch (Exception e) {
+            throw new RuntimeException("LM Hashing failed", e);
+        }
+    }
+
+    private static byte[] lmDesEncrypt(byte[] key7) throws Exception {
+        byte[] key8 = new byte[8];
+        key8[0] = (byte) (key7[0] >> 1);
+        key8[1] = (byte) (((key7[0] & 0x01) << 6) | (key7[1] >> 2));
+        key8[2] = (byte) (((key7[1] & 0x03) << 5) | (key7[2] >> 3));
+        key8[3] = (byte) (((key7[2] & 0x07) << 4) | (key7[3] >> 4));
+        key8[4] = (byte) (((key7[3] & 0x0F) << 3) | (key7[4] >> 5));
+        key8[5] = (byte) (((key7[4] & 0x1F) << 2) | (key7[5] >> 6));
+        key8[6] = (byte) (((key7[5] & 0x3F) << 1) | (key7[6] >> 7));
+        key8[7] = (byte) (key7[6] & 0x7F);
+        for (int i = 0; i < 8; i++) {
+            key8[i] = (byte) (key8[i] << 1);
+        }
+        javax.crypto.Cipher des = javax.crypto.Cipher.getInstance("DES/ECB/NoPadding", "BC");
+        des.init(
+                javax.crypto.Cipher.ENCRYPT_MODE,
+                new javax.crypto.spec.SecretKeySpec(key8, "DES"));
+        return des.doFinal("KGS!@#$%".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
     }
 
     public static String getHashAsHex(String rawPassword, HashAlgorithm hashAlgorithm) {
