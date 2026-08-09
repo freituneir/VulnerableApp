@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="referrer" content="unsafe-url" />
+    <!--
+      The reset token travels in this page's query string, so the page URL is itself a credential.
+      "unsafe-url" told the browser to attach that full URL, token and all, as the Referer on every
+      request the page makes, handing the token to any third party the page touches and writing it
+      into their access logs. "no-referrer" is the only policy that keeps a tokenised URL out of
+      requests to other origins, so it is set here rather than a same-origin relaxation.
+    -->
+    <meta name="referrer" content="no-referrer" />
     <title>VulnerableApp - Reset Password</title>
     <link rel="stylesheet" href="reset.css" />
 </head>
@@ -23,13 +30,13 @@
 
             <div id="level7ExternalCard" class="external-card hidden">
                 <h5>External Resource</h5>
-                <p class="external-copy">Level 7 intentionally loads a third-party image so the browser may send the full reset-link URL as the HTTP referrer.</p>
+                <p class="external-copy">This third-party resource is loaded with a no-referrer policy, so the reset-link URL is not sent to it.</p>
                 <img
                     id="level7ExternalImage"
                     class="external-image"
                     src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
-                    referrerpolicy="unsafe-url"
-                    alt="Third-party image used to demonstrate referrer leakage"
+                    referrerpolicy="no-referrer"
+                    alt="Third-party image loaded without a referrer"
                 />
             </div>
 

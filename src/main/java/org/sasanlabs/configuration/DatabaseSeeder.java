@@ -3,8 +3,7 @@ package org.sasanlabs.configuration;
 import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,7 +11,7 @@ import org.springframework.stereotype.Component;
  * database is populated before the app accepts requests.
  */
 @Component
-public class DatabaseSeeder {
+public class DatabaseSeeder implements SmartInitializingSingleton {
 
     private static final transient Logger LOGGER = LogManager.getLogger(DatabaseSeeder.class);
 
@@ -23,8 +22,8 @@ public class DatabaseSeeder {
         this.seeders = seeders;
     }
 
-    @EventListener(ApplicationReadyEvent.class) // Runs when  application is ready
-    public void seedAllModules() throws Exception {
+    @Override
+    public void afterSingletonsInstantiated() {
         LOGGER.info("Starting Global Database Seeding");
 
         for (ModuleSeeder seeder : seeders) {
@@ -44,7 +43,7 @@ public class DatabaseSeeder {
                         seeder.getModuleName(),
                         seeder.getModuleTable(),
                         e);
-                throw e;
+                throw new IllegalStateException("Database seeding failed", e);
             }
         }
 

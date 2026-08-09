@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.sasanlabs.configuration.EmailConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.mail.MailException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -39,13 +40,26 @@ public class EmailServiceImpl implements EmailService {
         message.setTo(to);
         message.setSubject(subject);
         message.setText(body);
-        try {
-            javaMailSender.send(message);
-        } catch (MailSendException ex) {
-            LOGGER.warn("Mail server unavailable while sending email to {}", to, ex);
-        }
+        send(() -> javaMailSender.send(message), to);
     }
 
+    /**
+     * Sends an HTML message, and treats a mail server that will not take it as a delivery problem
+     * rather than as a failure of whatever asked for the mail.
+     *
+     * <p>This used to call {@code send} outside any handler, so an unreachable or unauthenticated
+     * SMTP host turned every caller into a server error. That matters most for the password reset
+     * flow: the request endpoint has to answer the same way whether or not an account exists, and a
+     * 500 raised while delivering the mail told a caller both that the account existed and that the
+     * reset had got as far as sending, which is exactly the distinction the generic response is
+     * there to hide. It also made the whole flow unusable in any deployment without a mail server.
+     * The message has already been persisted by the time delivery is attempted, so swallowing a
+     * delivery failure loses nothing but the mail itself, which is logged.
+     *
+     * <p>The formatting failure below now returns instead of falling through: sending a
+     * half-populated message with no recipient would only have raised a second, more confusing
+     * error.
+     */
     @Override
     public void sendHtmlEmail(String to, String subject, String htmlBody) {
         validateEmailInputs(to, subject, htmlBody, "htmlBody");
@@ -57,9 +71,23 @@ public class EmailServiceImpl implements EmailService {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
         } catch (MessagingException ex) {
+            LOGGER.warn("Unable to build the message addressed to {}", to, ex);
+            return;
+        }
+        send(() -> javaMailSender.send(message), to);
+    }
+
+    /**
+     * Runs a delivery attempt and downgrades any mail layer failure to a warning. {@link
+     * MailException} is the root of the hierarchy, so this covers an unreachable host ({@link
+     * MailSendException}), a rejected login and a message the sender refuses to prepare alike.
+     */
+    private void send(Runnable delivery, String to) {
+        try {
+            delivery.run();
+        } catch (MailException ex) {
             LOGGER.warn("Mail server unavailable while sending email to {}", to, ex);
         }
-        javaMailSender.send(message);
     }
 
     @Override

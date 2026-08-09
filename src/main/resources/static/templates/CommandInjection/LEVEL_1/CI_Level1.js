@@ -11,5 +11,8 @@ function addingEventListenerToPingButton() {
 addingEventListenerToPingButton();
 
 function pingUtilityCallback(data) {
-  document.getElementById("pingUtilityResponse").innerHTML = data.content;
+  // The body carries whatever the ping utility wrote, which is derived from the submitted host.
+  // Parsing it as HTML would let that value become markup in the app's own origin, so it is
+  // written as a text node instead.
+  document.getElementById("pingUtilityResponse").textContent = data.content;
 }

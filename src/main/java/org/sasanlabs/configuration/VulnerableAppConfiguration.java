@@ -50,6 +50,9 @@ public class VulnerableAppConfiguration {
             Arrays.asList(
                     "/" + UnrestrictedFileUpload.CONTROLLER_PATH + "/" + LevelConstants.LEVEL_9);
 
+    /** Upper bound on a multipart request accepted on the overridden paths: 1 MiB. */
+    private static final long MAX_FILE_UPLOAD_SIZE_IN_BYTES = 1_048_576L;
+
     /**
      * Will Inject MessageBundle into messageSource bean.
      *
@@ -186,20 +189,48 @@ public class VulnerableAppConfiguration {
     }
 
     /**
-     * Customized MultipartFilter bean disables default max upload size for multipart files and
-     * their overall requests, for select paths. See {@link
-     * UnrestrictedFileUpload#getVulnerablePayloadLevel10()} for usage.
+     * Customized MultipartFilter bean that bounds the accepted multipart size for the paths listed
+     * in {@link #MAX_FILE_UPLOAD_SIZE_OVERRIDE_PATHS}.
+     *
+     * <p>These paths used to be resolved with {@code setMaxUploadSize(-1)}, which removed the limit
+     * entirely. That is an uncontrolled resource consumption flaw and a controller side size check
+     * cannot close it: commons-fileupload spools the whole request body to a temporary file before
+     * the handler is ever invoked, so the disk is already consumed by the time the handler could
+     * refuse it. The limit is therefore enforced by the resolver, which is the only layer that sees
+     * the request before it is buffered.
      */
     @Bean
     @Order(0)
     public MultipartFilter multipartFilter() {
         class MaxUploadSizeOverrideMultipartFilter extends MultipartFilter {
             @Override
+            protected void doFilterInternal(
+                    HttpServletRequest request,
+                    javax.servlet.http.HttpServletResponse response,
+                    javax.servlet.FilterChain filterChain)
+                    throws javax.servlet.ServletException, IOException {
+                try {
+                    super.doFilterInternal(request, response, filterChain);
+                } catch (org.springframework.web.multipart.MultipartException e) {
+                    // The size bound is enforced here rather than in the handler, so an oversized
+                    // request is refused before the handler ever runs and the exception would
+                    // otherwise escape the filter chain as a server error. The refusal is reported
+                    // with the same body the handler uses for input it will not store, so a client
+                    // sees a rejected upload rather than a broken endpoint.
+                    response.setStatus(javax.servlet.http.HttpServletResponse.SC_OK);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"content\":\"Input is invalid\",\"isValid\":false}");
+                    response.getWriter().flush();
+                }
+            }
+
+            @Override
             protected MultipartResolver lookupMultipartResolver(HttpServletRequest request) {
                 if (MAX_FILE_UPLOAD_SIZE_OVERRIDE_PATHS.contains(request.getServletPath())) {
                     CommonsMultipartResolver multipart = new CommonsMultipartResolver();
-                    multipart.setMaxUploadSize(-1);
-                    multipart.setMaxUploadSizePerFile(-1);
+                    multipart.setMaxUploadSize(MAX_FILE_UPLOAD_SIZE_IN_BYTES);
+                    multipart.setMaxUploadSizePerFile(MAX_FILE_UPLOAD_SIZE_IN_BYTES);
                     return multipart;
                 } else {
                     // returns default implementation
@@ -209,5 +240,44 @@ public class VulnerableAppConfiguration {
         }
         ;
         return new MaxUploadSizeOverrideMultipartFilter();
+    }
+
+    /**
+     * Sends framing protection on every response, not only on the JSON answers of the clickjacking
+     * levels.
+     *
+     * <p>A clickjacking attack frames whatever the victim actually sees, and the pages of a level
+     * are served straight out of {@code static/} by the resource handler, which no controller ever
+     * touches. Setting the headers in the controller alone therefore protected the API answer while
+     * leaving the page that renders it embeddable. {@code X-Frame-Options: DENY} is the legacy
+     * control and {@code frame-ancestors 'none'} its modern replacement, so both are sent and old
+     * and current browsers alike refuse to render any of it inside a frame. DENY rather than
+     * SAMEORIGIN, because a same-origin attacker page is enough to mount the overlay attack.
+     */
+    @Bean
+    @Order(1)
+    public javax.servlet.Filter framingProtectionFilter() {
+        return new org.springframework.web.filter.OncePerRequestFilter() {
+            @Override
+            protected void doFilterInternal(
+                    HttpServletRequest request,
+                    javax.servlet.http.HttpServletResponse response,
+                    javax.servlet.FilterChain filterChain)
+                    throws javax.servlet.ServletException, IOException {
+                // Set on every response without exception. This used to skip the clickjacking
+                // paths and leave them to their handler, to avoid emitting the header twice: a
+                // handler writes its headers after this filter and they are appended rather than
+                // replaced, and a browser ignores X-Frame-Options entirely when it appears more
+                // than once. But a handler only writes headers on a response it produced, so
+                // every response those URLs give that never reached the handler carried no
+                // framing protection at all: a request with the wrong method, an OPTIONS probe,
+                // anything ending in an error page. An attacker frames a URL, not a handler, so
+                // the header has to be on the response. Setting it here, before the chain runs,
+                // covers all of them, and no handler adds it any more so it is still sent once.
+                response.setHeader("X-Frame-Options", "DENY");
+                response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+                filterChain.doFilter(request, response);
+            }
+        };
     }
 }

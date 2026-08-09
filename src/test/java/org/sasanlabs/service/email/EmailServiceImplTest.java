@@ -100,7 +100,23 @@ class EmailServiceImplTest {
         assertDoesNotThrow(
                 () -> emailService.sendHtmlEmail("student@example.com", "Subject", "<b>Body</b>"));
 
-        verify(javaMailSender).send(mimeMessage);
+        // A message that could not be populated has no recipient, so sending it would only raise a
+        // second and less informative failure.
+        verify(javaMailSender, org.mockito.Mockito.never()).send(mimeMessage);
+    }
+
+    @Test
+    void shouldNotFailWhenMailServerIsUnavailableForHtmlEmail() {
+        MimeMessage mimeMessage = new MimeMessage((Session) null);
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        org.mockito.Mockito.doThrow(new MailSendException("SMTP unavailable"))
+                .when(javaMailSender)
+                .send(mimeMessage);
+
+        // A caller of this method is doing something else that has already succeeded, so an
+        // unreachable mail server has to stay a delivery problem rather than becoming their error.
+        assertDoesNotThrow(
+                () -> emailService.sendHtmlEmail("student@example.com", "Subject", "<b>Body</b>"));
     }
 
     @Test
