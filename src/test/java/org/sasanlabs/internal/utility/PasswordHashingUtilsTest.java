@@ -8,30 +8,12 @@ import org.junit.jupiter.api.Test;
 class PasswordHashingUtilsTest {
 
     @Test
-    @DisplayName("MD4: Should generate a correct unsalted hash")
-    void md4Hash_CorrectHex() {
-        // Known MD4 hash for "password123"
-        String expected = "fc7b71b67e964466cec486ab12f4b558";
-        String actual = PasswordHashingUtils.md4Hex("password123");
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    @DisplayName("MD5: Should generate a correct unsalted hash")
-    void md5Hash_CorrectHex() {
-        // Known MD5 hash for "password"
-        String expected = "5f4dcc3b5aa765d61d8327deb882cf99";
-        String actual = PasswordHashingUtils.md5Hex("password");
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    @DisplayName("Unsalted SHA-256: Should generate a correct unsalted hash")
+    @DisplayName("SHA-256: Should generate a correct salted hash")
     void sha256Hash_CorrectHex() {
-        // Known SHA-256 hash for "password"
-        String expected = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8";
-        String actual = PasswordHashingUtils.unsaltedSha256Hex("password");
-        assertEquals(expected, actual);
+        // Known SHA-256 hash for "salt" + "password"
+        String expected = "13601bda4ea78e55a07b98866d2be6be0744e3866f13c00c811cab608a28f322";
+        assertEquals(expected, PasswordHashingUtils.sha256Hex("salt", "password"));
+        assertNotEquals(expected, PasswordHashingUtils.sha256Hex("othersalt", "password"));
     }
 
     @Test
@@ -48,6 +30,22 @@ class PasswordHashingUtilsTest {
     }
 
     @Test
+    @DisplayName("SHA-256: A stored value without a salt separator must never authenticate")
+    void isValidSaltedSha256_RejectsCleartextStoredValue() {
+        assertFalse(PasswordHashingUtils.isValidSaltedSha256("hunter2", "hunter2"));
+    }
+
+    @Test
+    @DisplayName("Digest comparison: Should fold case and reject mismatches and nulls")
+    void hexDigestsMatch_Comparison() {
+        assertTrue(PasswordHashingUtils.hexDigestsMatch("ABCdef01", "abcdef01"));
+        assertFalse(PasswordHashingUtils.hexDigestsMatch("abcdef01", "abcdef02"));
+        assertFalse(PasswordHashingUtils.hexDigestsMatch("abcdef01", "abcdef0"));
+        assertFalse(PasswordHashingUtils.hexDigestsMatch(null, "abcdef01"));
+        assertFalse(PasswordHashingUtils.hexDigestsMatch("abcdef01", null));
+    }
+
+    @Test
     @DisplayName("BCrypt: Should validate successfully even though hashes are unique each time")
     void bcrypt_UniqueGenerationAndValidation() {
         String password = "mySecretPassword";
@@ -60,17 +58,6 @@ class PasswordHashingUtilsTest {
         // But both should be valid
         assertTrue(PasswordHashingUtils.isValidBcrypt(password, hash1));
         assertTrue(PasswordHashingUtils.isValidBcrypt(password, hash2));
-    }
-
-    @Test
-    @DisplayName("LM Hash: Should be case-insensitive and match legacy standards")
-    void lmHash_LegacyStandards() {
-        // Known LM hash for "password" (which it converts to "PASSWORD")
-        String expected = "e52cac67419a9a224a3b108f3fa6cb6d";
-
-        assertEquals(expected, PasswordHashingUtils.lmHash("password"));
-        assertEquals(expected, PasswordHashingUtils.lmHash("PASSWORD"));
-        assertEquals(expected, PasswordHashingUtils.lmHash("pAsSwOrD"));
     }
 
     @Test
