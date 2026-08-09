@@ -1,3 +1,11 @@
+function setResult(element, message) {
+  // Server text, rendered as text.
+  element.replaceChildren();
+  const strong = document.createElement("strong");
+  strong.textContent = message;
+  element.appendChild(strong);
+}
+
 function loadChallenge() {
   let url = getUrlForVulnerabilityLevel();
   doGetAjaxCall(displayChallenge, url, true);
@@ -5,7 +13,11 @@ function loadChallenge() {
 
 function displayChallenge(data) {
   let challengeDiv = document.getElementById("challenge");
-  challengeDiv.innerHTML = "<strong>" + data.content + "</strong>";
+  // The server message is text: written through innerHTML it would be parsed as markup.
+  challengeDiv.replaceChildren();
+  const challengeText = document.createElement("strong");
+  challengeText.textContent = data.content;
+  challengeDiv.appendChild(challengeText);
   if (data.isValid) {
     challengeDiv.className = "challenge-secure";
   } else {
@@ -22,7 +34,7 @@ function addingEventListenerToSubmitButton() {
 
       if (!password) {
         let resultDiv = document.getElementById("result");
-        resultDiv.innerHTML = "<strong>Please enter a password guess.</strong>";
+        setResult(resultDiv, "Please enter a password guess.");
         resultDiv.style.color = "red";
         return;
       }
@@ -41,10 +53,10 @@ function addingEventListenerToSubmitButton() {
 function appendResponseCallback(data) {
   let resultDiv = document.getElementById("result");
   if (data.isValid) {
-    resultDiv.innerHTML = "<strong>Result:</strong> " + data.content;
+    setResult(resultDiv, "Result: " + data.content);
     resultDiv.className = "result-success";
   } else {
-    resultDiv.innerHTML = "<strong>Result:</strong> " + data.content;
+    setResult(resultDiv, "Result: " + data.content);
     resultDiv.className = "result-failure";
   }
 }
