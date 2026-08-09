@@ -6,14 +6,9 @@ function setResult(element, message) {
   element.appendChild(strong);
 }
 
-// The level endpoints answer POST only, so the description is fetched with an empty
-// submission rather than a GET. Nothing about this request is sensitive; it is a POST
-// purely because the endpoint no longer accepts a password in a URL.
 function loadChallenge() {
   let url = getUrlForVulnerabilityLevel();
-  doPostAjaxCall(displayChallenge, url, true, "", {
-    "Content-Type": "application/x-www-form-urlencoded",
-  });
+  doGetAjaxCall(displayChallenge, url, true);
 }
 
 function displayChallenge(data) {
@@ -44,14 +39,10 @@ function addingEventListenerToSubmitButton() {
         return;
       }
 
-      // The guess goes in the body. Appended to the URL it would be copied into access
-      // logs, browser history and any outbound Referer header.
-      let body = new URLSearchParams();
-      body.append("password", password);
+      let params = new URLSearchParams();
+      params.append("password", password);
 
-      doPostAjaxCall(appendResponseCallback, url, true, body.toString(), {
-        "Content-Type": "application/x-www-form-urlencoded",
-      });
+      doGetAjaxCall(appendResponseCallback, url + "?" + params.toString(), true);
     });
 }
 
