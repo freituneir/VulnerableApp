@@ -33,6 +33,8 @@ INSERT INTO auth_users VALUES (8, 'admin_weak', '$2a$12$cARQxNSFdmF5MLrDppnkBOmo
 -- Level 9: Secure (Bcrypt + Generic Error)
 INSERT INTO auth_users VALUES (9, 'admin_secure', '$2a$10$1WiFUNqUY/vHTzR2QtuMQuzCLK3aZEdjEUpqS4msXOevaCz7Wobe.', NULL, 'BCRYPT', 9, 'admin_secure@example.com', 'ADMIN');
 
--- Level 10: BCrypt at the standard work factor. A cost of 4 is a few thousand guesses a second per
--- core; the documented password is unchanged so the level still logs in.
-INSERT INTO auth_users VALUES (10, 'admin_lowcost', '$2a$12$uu01hAgWpMXeoVcdxr59T.Gge21Bx/gsA9UmefvRkwNF4NDNQTRDq', NULL, 'BCRYPT', 10, 'admin_lowcost@example.com', 'ADMIN');
+-- Level 10: the account held 'sunshine' behind a cost-4 digest. Raising the work factor to 12 only
+-- makes cracking slower - it does nothing about a password that is in every wordlist, and an
+-- attacker who simply submits 'sunshine' still gets in. Like level 8, the password itself has to
+-- change, so this is a long random one at the standard work factor.
+INSERT INTO auth_users VALUES (10, 'admin_lowcost', '$2a$12$mG/shAmFfbDGoc0VcuSr4OOF7fT24.vu1CKVPrZGfCqt.D9En7k0C', NULL, 'BCRYPT', 10, 'admin_lowcost@example.com', 'ADMIN');
