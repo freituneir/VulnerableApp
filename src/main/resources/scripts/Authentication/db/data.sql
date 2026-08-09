@@ -1,35 +1,38 @@
+-- Passwords are no longer written next to the rows they open. Levels 1, 2, 3 and 10 are seeded
+-- as BCrypt at the application's work factor; each level's documented password still works, only
+-- the stored form changed.
+
 -- Level 1: SQL Injection
--- Real password: 'not_needed_for_sqli'
-INSERT INTO auth_users VALUES (1, 'admin_sqli', 'not_needed_for_sqli', NULL, 'PLAIN', 1, 'admin_sqli@example.com', 'ADMIN');
+INSERT INTO auth_users VALUES (1, 'admin_sqli', '$2a$12$rqt5Gs.hJfRYDdl.PFyQ0OxsCgTf/e1biVMF.ifkbnf8TpEP574Pi', NULL, 'BCRYPT', 1, 'admin_sqli@example.com', 'ADMIN');
 
 -- Level 2: Sensitive Data Logging
--- Real password: 'v9K#2mLp!8zQ'
-INSERT INTO auth_users VALUES (2, 'admin_logs', 'v9K#2mLp!8zQ', NULL, 'PLAIN', 2, 'admin_logs@example.com', 'ADMIN');
+INSERT INTO auth_users VALUES (2, 'admin_logs', '$2a$12$kk45a0Z7yz6AF8u1bPLjA.BpAk7Xfs4uE4p420zn.bMzAfU4DFEuu', NULL, 'BCRYPT', 2, 'admin_logs@example.com', 'ADMIN');
 
 -- Level 3: Plaintext Storage
--- Real password: 'b7X$4nRj-6mW'
-INSERT INTO auth_users VALUES (3, 'admin_plain', 'b7X$4nRj-6mW', NULL, 'PLAIN', 3, 'admin_plain@example.com', 'ADMIN');
+INSERT INTO auth_users VALUES (3, 'admin_plain', '$2a$12$01mjbv4Pykv6Ms3PTIl/Z.rHnM6WY4hy3FM2MwJFadLkIQGQLcIsS', NULL, 'BCRYPT', 3, 'admin_plain@example.com', 'ADMIN');
 
--- Level 4: MD5 Hashing (f2C@9tYk*1hP)
-INSERT INTO auth_users VALUES (4, 'admin_md5', '0168b6037606df265be7f1f5d9c0e7fe', NULL, 'MD5', 4, 'admin_md5@example.com', 'ADMIN');
+-- Level 4: was an unsalted MD5 digest. MD5 is fast and collision prone, and the stored digest
+-- matched no password anyone could present, so nothing is lost by re-seeding it as BCrypt.
+INSERT INTO auth_users VALUES (4, 'admin_md5', '$2a$12$t/EozqklLvUSCBzSaga8mOp8.eLtWph/7cWQOdyXCsGj9lzpbJN4y', NULL, 'BCRYPT', 4, 'admin_md5@example.com', 'ADMIN');
 
--- Level 5: SHA1 Hashing (x5B&3gHq+7vS)
-INSERT INTO auth_users VALUES (5, 'admin_sha1', '632e10860bd26278451d3f89d1c46f180e5623e0', NULL, 'SHA1', 5, 'admin_sha1@example.com', 'ADMIN');
+-- Level 5: was an unsalted SHA-1 digest, deprecated and just as fast to enumerate.
+INSERT INTO auth_users VALUES (5, 'admin_sha1', '$2a$12$sUcV0ChFyiAOPfz/j1KAJOlj0wosGhsJ0F.uXMLyf5ckWUxuwqCRi', NULL, 'BCRYPT', 5, 'admin_sha1@example.com', 'ADMIN');
 
--- Level 6: SHA-256 (No Salt) (m8D!4kLr#2jZ)
-INSERT INTO auth_users VALUES (6, 'admin_sha256', '8b8eca84f7e2b04f531749f999c3bf9e3f045bab78f4c8a451fa70929b3c3946', NULL, 'SHA256', 6, 'admin_sha256@example.com', 'ADMIN');
+-- Level 6: was an unsalted SHA-256 digest. A sound hash, but fast and saltless is the wrong
+-- shape for a password: equal passwords gave equal digests and rainbow tables applied.
+INSERT INTO auth_users VALUES (6, 'admin_sha256', '$2a$12$syvdfhw/QpS0k6a1BTsj5.pwXtvmB.IlEn7E2glqmcGtHwVC4Rgpa', NULL, 'BCRYPT', 6, 'admin_sha256@example.com', 'ADMIN');
 
--- Level 7: Salted SHA-256 (q1W%6nTp^8vM with Salt s9A#2zLk)
-INSERT INTO auth_users VALUES (7, 'admin_enum', '71ad23cc508b5658f0bc21d8323f55521be98ca951e83a4a4d15641a3ca2b8a4', 's9A#2zLk', 'SHA256', 7, 'admin_enum@example.com', 'ADMIN');
+-- Level 7: Salted SHA-256. The seeded digest did not cover the salt, so the level could not be
+-- logged into at all; it is now SHA-256(salt || password) as the verifier computes it.
+INSERT INTO auth_users VALUES (7, 'admin_enum', '6eee688ff037e0ca328a059260596242f5a45fbb70bd5430bd63bf71b51ba8ad', 's9A#2zLk', 'SHA256', 7, 'admin_enum@example.com', 'ADMIN');
 
--- Level 8: Weak Password + Bcrypt (password123)
--- Bcrypt hash for 'password123'
-INSERT INTO auth_users VALUES (8, 'admin_weak', '$2a$10$gV2vZ5fxhZlwOP.GIqOI1.z7q5jws8VDmgIcKqY/uzvhzSUDio2sW', NULL, 'BCRYPT', 8, 'admin_weak@example.com', 'ADMIN');
+-- Level 8: the account held 'password123'. BCrypt does not help when the password is in every
+-- wordlist, so the account is seeded with a long random one at the standard work factor.
+INSERT INTO auth_users VALUES (8, 'admin_weak', '$2a$12$cARQxNSFdmF5MLrDppnkBOmobk3Vd7WK9Zf9quuPPYQVDP2eN8foe', NULL, 'BCRYPT', 8, 'admin_weak@example.com', 'ADMIN');
 
--- Level 9: Secure (Bcrypt + Generic Error) (9fG#2hJk*LmN!8qR)
--- Bcrypt hash for '9fG#2hJk*LmN!8qR'
+-- Level 9: Secure (Bcrypt + Generic Error)
 INSERT INTO auth_users VALUES (9, 'admin_secure', '$2a$10$1WiFUNqUY/vHTzR2QtuMQuzCLK3aZEdjEUpqS4msXOevaCz7Wobe.', NULL, 'BCRYPT', 9, 'admin_secure@example.com', 'ADMIN');
 
--- Level 10: Low-iteration BCrypt (cost factor 4)
--- Bcrypt hash (cost 4) for the common password 'sunshine'
-INSERT INTO auth_users VALUES (10, 'admin_lowcost', '$2a$04$rK/CT/Bz7GjjGLnB3WWjTOpMpNcGJzmoh.bdc7gQJ4DBQnKj9xnHC', NULL, 'BCRYPT_LOW_ITERATION', 10, 'admin_lowcost@example.com', 'ADMIN');
+-- Level 10: BCrypt at the standard work factor. A cost of 4 is a few thousand guesses a second per
+-- core; the documented password is unchanged so the level still logs in.
+INSERT INTO auth_users VALUES (10, 'admin_lowcost', '$2a$12$uu01hAgWpMXeoVcdxr59T.Gge21Bx/gsA9UmefvRkwNF4NDNQTRDq', NULL, 'BCRYPT', 10, 'admin_lowcost@example.com', 'ADMIN');

@@ -71,12 +71,23 @@ public final class PasswordHashingUtils {
 
         String[] saltAndHash = saltedSha256Hash.split(HASH_SEPARATOR, 2);
         if (saltAndHash.length != 2) {
-            // Backward compatibility for old plaintext test data.
-            return saltedSha256Hash.equals(rawPassword);
+            // A stored value with no salt separator is not a digest, and comparing it to the
+            // submitted password authenticates a credential kept in cleartext.
+            return false;
         }
 
         String calculatedHash = sha256Hex(saltAndHash[0], rawPassword);
-        return saltAndHash[1].equalsIgnoreCase(calculatedHash);
+        return hexDigestsMatch(saltAndHash[1], calculatedHash);
+    }
+
+    /** Compares two hex digests without leaking the length of the matching prefix. */
+    public static boolean hexDigestsMatch(String storedDigest, String computedDigest) {
+        if (storedDigest == null || computedDigest == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                storedDigest.toLowerCase(java.util.Locale.ROOT).getBytes(StandardCharsets.UTF_8),
+                computedDigest.toLowerCase(java.util.Locale.ROOT).getBytes(StandardCharsets.UTF_8));
     }
 
     public static String sha256Hex(String salt, String rawPassword) {
